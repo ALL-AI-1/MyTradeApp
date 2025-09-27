@@ -1,0 +1,67 @@
+name: Build & Release Android APK
+
+on:
+  push:
+    tags:
+      - "v*.*.*"   # Trigger only when you push a version tag like v1.0.0
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      # Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Setup Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      # Install system dependencies
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            git zip unzip wget build-essential \
+            openjdk-17-jdk python3-venv python3-pip autoconf libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake \
+            libffi-dev libssl-dev
+
+      # Install Buildozer
+      - name: Install Buildozer
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip setuptools wheel
+          pip install Cython==0.29.33 virtualenv buildozer
+
+      # Cache Buildozer output (speeds up next builds)
+      - name: Cache Buildozer
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildozer
+          key: ${{ runner.os }}-buildozer
+
+      # Build APK
+      - name: Build APK
+        run: |
+          source .venv/bin/activate
+          buildozer -v android debug
+
+      # Upload APK as artifact (optional)
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyTradeApp-APK
+          path: bin/*.apk
+
+      # Create GitHub Release and upload APK
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bin/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
